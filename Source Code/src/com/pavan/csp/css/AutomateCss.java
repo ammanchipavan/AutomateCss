@@ -1,55 +1,19 @@
 /**
  * 
  */
-package com.infor.csp.jsp;
+package com.pavan.csp.jsp;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-/**
 
- *---Begin Copyright Notice---
-
- * 
-
- *NOTICE
-
- * 
-
- *THIS SOFTWARE IS THE PROPERTY OF AND CONTAINS CONFIDENTIAL INFORMATION OF
-
- *INFOR AND/OR ITS AFFILIATES OR SUBSIDIARIES AND SHALL NOT BE DISCLOSED
-
- *WITHOUT PRIOR WRITTEN PERMISSION. LICENSED CUSTOMERS MAY COPY AND ADAPT
-
- *THIS SOFTWARE FOR THEIR OWN USE IN ACCORDANCE WITH THE TERMS OF THEIR
-
- *SOFTWARE LICENSE AGREEMENT. ALL OTHER RIGHTS RESERVED.
-
- * 
-
- *(c) COPYRIGHT 2018 INFOR. ALL RIGHTS RESERVED. THE WORD AND DESIGN MARKS
-
- *SET FORTH HEREIN ARE TRADEMARKS AND/OR REGISTERED TRADEMARKS OF INFOR
-
- *AND/OR ITS AFFILIATES AND SUBSIDIARIES. ALL RIGHTS RESERVED. ALL OTHER
-
- *TRADEMARKS LISTED HEREIN ARE THE PROPERTY OF THEIR RESPECTIVE OWNERS.
-
- * 
-
- *---End Copyright Notice---
-
- */
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 import java.util.regex.Pattern;
-import javax.swing.JFileChooser;
-import javax.swing.filechooser.FileSystemView;
-import javax.swing.JOptionPane;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -64,6 +28,7 @@ public class AutomateCss {
 	public static final String CSS_FILE_EXTENSION = ".css";
 	public static final String JS_FILE_EXTENSION = ".js";
 	public static final String LOG_FILE_EXTENSION = ".log";
+	public static final String FILE_PATH = "C:/SupplyWeb/metricscpy";
 	public static final String ORIGINAL_SUFFIX = "-original";
 	public static final String ORIGINAL_DIRECTORY = "original";
 	public static final String CSS_DIRECTORY = "css";
@@ -75,7 +40,7 @@ public class AutomateCss {
 	public static final String CSS_STYLE_INLINE_TAG = "style=";
 	public static final String JS_SCRIPT_START = "<script type=\"text/javascript\">";
 	public static final String JS_SCRIPT_END = "</script>";
-	private static String directoryPath = "";
+	//List<String> jsStrList = new ArrayList<>();
 	
 	/**
 	 * List all files from a directory and its sub-directories
@@ -85,9 +50,10 @@ public class AutomateCss {
 	 */
 	private void listFilesAndFilesSubDirectories(String directoryName) {
 		File directory = new File(directoryName);
-		String logFile = directoryPath + File.separator + AutomateCss.class.getSimpleName() + LOG_FILE_EXTENSION;
+		String logFile = FILE_PATH + File.separator + AutomateCss.class.getSimpleName() + LOG_FILE_EXTENSION;
 		List<String> logsList = new ArrayList<>();
 		
+		// get all the files from a directory
 		File[] fList = directory.listFiles();
 		for (File file : fList) {
 			if (!file.isDirectory()){
@@ -101,8 +67,6 @@ public class AutomateCss {
 				logOut.write(log);
 				logOut.newLine();
 			}
-			
-			JOptionPane.showMessageDialog(null, "CSP files processed successfully at directory: " + directoryName);
 		}catch(IOException ioe){
 			System.out.println("Error occurred while processing formatted CSS from JSP's");
 		}
@@ -119,18 +83,20 @@ public class AutomateCss {
 		String line = null;
 		int lineNumber = 0;
 		int styleCounter = 1;
+		String fileNameOnly = FilenameUtils.removeExtension(fileName);
+		//Copy actual name with suffix '-original'
+		copyJspFile(filePath, fileNameOnly);
+		
+		String originalJspFile = FILE_PATH + File.separator + ORIGINAL_DIRECTORY + File.separator + fileNameOnly + ORIGINAL_SUFFIX + JSP_FILE_EXTENSION;
+		String newJspFile = FILE_PATH + File.separator + fileNameOnly + JSP_FILE_EXTENSION;
+		
+		String newCssFile = FILE_PATH + File.separator + CSS_DIRECTORY + File.separator + fileNameOnly + CSS_FILE_EXTENSION;
+		String newJsFile = FILE_PATH + File.separator + JS_DIRECTORY + File.separator + fileNameOnly + JS_FILE_EXTENSION;
+		
 		List<String> cssStrList = new ArrayList<>();
 		List<String> jspStrList = new ArrayList<>();
 		List<String> jsStrList = new ArrayList<>();
 		boolean isCssStyle = true;
-		String fileNameOnly = FilenameUtils.removeExtension(fileName);
-		
-		copyJspFile(filePath, fileNameOnly);
-		
-		String originalJspFile = directoryPath + File.separator + ORIGINAL_DIRECTORY + File.separator + fileNameOnly + ORIGINAL_SUFFIX + JSP_FILE_EXTENSION;
-		String newJspFile = directoryPath + File.separator + fileNameOnly + JSP_FILE_EXTENSION;
-		String newCssFile = directoryPath + File.separator + CSS_DIRECTORY + File.separator + fileNameOnly + CSS_FILE_EXTENSION;
-		String newJsFile = directoryPath + File.separator + JS_DIRECTORY + File.separator + fileNameOnly + JS_FILE_EXTENSION;
 		
 		try (BufferedReader br = new BufferedReader(new FileReader(originalJspFile));) {
 			
@@ -140,10 +106,12 @@ public class AutomateCss {
 			List<Integer> styleTagNos = grepCssLineNumberArray(originalJspFile, CSS_STYLE_INLINE_TAG, isCssStyle);
 			List<Integer> scriptTagNos = grepCssLineNumberArray(originalJspFile, JS_SCRIPT_START, !isCssStyle);
 			
+			//Processing style tag & non-style tag content in jsp
 			while ((line = br.readLine()) != null) {
 				lineNumber++;
 				if (lineNumber > styleStart && lineNumber < styleEnd) {
 					cssStrList.add(line);
+					//logsList.add("<style> tag's are processed at line number: " + lineNumber + ", ------> " + originalJspFile);
 				}else{
 					if(!(line.contains(CSS_STYLE_START_TAG) || line.contains(CSS_STYLE_END_TAG))){
 						if(headEnd == lineNumber){
@@ -155,6 +123,7 @@ public class AutomateCss {
 							styleCounter++;
 						}
 						else{
+							//JS and JSP (scriplet) code
 							jspStrList.add(line);
 						}
 					}
@@ -168,6 +137,7 @@ public class AutomateCss {
 			deleteJsContentInJsp(jsStrList, jspStrList);
 			
 			if(cssStrList.size() > 0){
+				//Building new css at /css directory
 				try(BufferedWriter cssOut = new BufferedWriter(new FileWriter(newCssFile));){
 					for (String cssStr : cssStrList) {
 						cssOut.write(cssStr);
@@ -176,6 +146,7 @@ public class AutomateCss {
 				}
 			}
 			if(jspStrList.size() > 0){
+				//Building new jsp, removing style tag
 				try(BufferedWriter jspWriter = new BufferedWriter(new FileWriter(newJspFile));){
 					for (String jspStr : jspStrList) {
 						jspWriter.write(jspStr);
@@ -184,7 +155,9 @@ public class AutomateCss {
 				}
 				logsList.add("<style> tag's are processed & new css file path: , ------> " + newCssFile);
 			}else{
+				//Deleting newly created jsp file if there is no css
 				logsList.add("No <style> tag to the JSP ------> " + originalJspFile);
+				//new File(newJspFile).delete();
 			}
 			
 			if(jsStrList.size() > 0){
@@ -211,10 +184,12 @@ public class AutomateCss {
 	 */
 	private void copyJspFile(String filePath, String fileNameOnly){
 		try {
-			FileUtils.copyFile(new File(filePath), new File(directoryPath + File.separator + ORIGINAL_DIRECTORY + File.separator + fileNameOnly + ORIGINAL_SUFFIX + JSP_FILE_EXTENSION));
-			new File(directoryPath + File.separator + CSS_DIRECTORY).mkdir();
-			new File(directoryPath + File.separator + JS_DIRECTORY).mkdir();
-			new File(directoryPath + File.separator + JS_DIRECTORY + File.separator + fileNameOnly + JS_FILE_EXTENSION).createNewFile();
+			FileUtils.copyFile(new File(filePath), new File(FILE_PATH + File.separator + ORIGINAL_DIRECTORY + File.separator + fileNameOnly + ORIGINAL_SUFFIX + JSP_FILE_EXTENSION));
+			//new File(filePath).delete();
+			//new File(filePath).createNewFile();
+			new File(FILE_PATH + File.separator + CSS_DIRECTORY).mkdir();
+			new File(FILE_PATH + File.separator + JS_DIRECTORY).mkdir();
+			new File(FILE_PATH + File.separator + JS_DIRECTORY + File.separator + fileNameOnly + JS_FILE_EXTENSION).createNewFile();
 		} catch (IOException e) {
 			System.out.println("Error while copying files");
 		}
@@ -256,9 +231,11 @@ public class AutomateCss {
 			while ((line = br.readLine()) != null) {
 				lineNumber++;
 				
-				if (isCssStyle && (line.contains(word))) {
+				if (isCssStyle && (line.contains(word))) { // commented condition  && !line.contains("\'")
+					//Css style str list
 					strList.add(lineNumber);
 				}else if (!isCssStyle && (line.contains(word) || line.contains("<script>"))) {
+					// Js style str list
 					strList.add(lineNumber);
 				}
 			}
@@ -271,44 +248,66 @@ public class AutomateCss {
 	public List<String> grepJsLineNumberArray(String file, String scriptEnd, Integer scriptLineNo, List<String> jspList, List<String> logsList) {
 		List<String> jsList = new ArrayList<>();
 		int lineNumber = 1;
+		//++scriptLineNo;
+		
 		int startBraceCounter = 0;
 		boolean isFunctionStarted = false;
 		List<String> functionStrList = new ArrayList<>();
+		List<String> functionStringList = new ArrayList<>();
 		StringBuffer functionStr = new StringBuffer();
+		//int jsRemovalCounter = jsList.size()-1;
 		boolean isScriptStarted = false;
-		
 		try (BufferedReader br = new BufferedReader(new FileReader(file));) {
 			String line;
 			while ((line = br.readLine()) != null) {
 				if (lineNumber == scriptLineNo || isScriptStarted) {
 					isScriptStarted = true;
 					if(line.contains(scriptEnd)){
+						//jspList.remove(line);
+						/*if(functionStringList.size() > 0){
+							jspList.addAll(lineNumber-jsRemovalCounter, functionStringList);
+						}*/
 						logsList.add("</script> tag's reached for JSP ------> " + file + ", lineNumber:" + lineNumber);	
 						break;
 					}
 					if(line.contains("var") && !line.contains("<%") && startBraceCounter == 0){
+						//If a global variable doesn't contain scriptlet tag, add to js list.
 						jsList.add(line);
 						jspList.remove(line);
+						//jsRemovalCounter++;
 					}else if(line.contains("function") || isFunctionStarted){
+						//Add to a string/list where function starts and ends
 						isFunctionStarted = true;
 						functionStr.append(line);
 						functionStrList.add(line);
+						//System.out.println(lineNumber-jsRemovalCounter);
+						
+						//jspList.remove(lineNumber-jsRemovalCounter);
+						//jsRemovalCounter++;
 						
 						if(line.contains("{") && line.contains("}")){
 						}else if(line.contains("{"))
 							startBraceCounter++;
 						else if(line.contains("}"))
 							startBraceCounter--;
-
+						//End of function tag
 						if(startBraceCounter == 0 && !line.contains("function")){
 							isFunctionStarted = false;
 							if(!functionStr.toString().contains("<%")){
 								jsList.addAll(functionStrList);
+							}else{
+								functionStringList.addAll(functionStrList);
+								/*jspList.remove(lineNumber-jsRemovalCounter);
+								jsRemovalCounter++;*/
 							}
 							functionStr = new StringBuffer();
 							functionStrList.clear();
 						}
 					}
+					/*else{
+						jsList.add(line);
+						jspList.remove(line);
+					}*/
 				}
 				lineNumber++;
 			}
@@ -324,20 +323,21 @@ public class AutomateCss {
 	 * @return
 	 */
 	private String splitDirectoryPath(){
-		String[] dirs = directoryPath.split(Pattern.quote("\\"));
-		if(dirs.length > 6){
-			return dirs[4] + FILE_PATH_SEPARATOR + dirs[5] + FILE_PATH_SEPARATOR + dirs[6];
-		}else{
-			return dirs[4] + FILE_PATH_SEPARATOR + dirs[5];
-		}
+		/*String[] dirs = FILE_PATH.split("/");
+		return dirs[4] + FILE_PATH_SEPARATOR + dirs[5] + FILE_PATH_SEPARATOR + dirs[6];*/
+		return "SupplyWeb";
 	}
 	
 	private void processCssInlineStyle(String line, String fileNameOnly, List<String> cssList, List<String> jspList, int styleCounter, List<String> logsList){
+		//Tags pattern matcher
 		Pattern p = Pattern.compile("^[-\\w.]+");
-	    String nonCssLine = null;
+	    //Matcher m = p.matcher("Pavan<");
+	    
+		//ID selector for CSS
 		String tagFinder = line.substring(1, line.indexOf(" "));
 		String tag = tagFinder.contains("><") ? tagFinder.split("><")[1] : tagFinder;
 		
+		//Matching the tag name with only alphabets a to z
 		if(p.matcher(tag).matches()){
 			String cssId = fileNameOnly + "_" + tag + styleCounter;
 			String styleStartStg = line.substring(line.indexOf("style=") + 7, line.length());
@@ -351,7 +351,8 @@ public class AutomateCss {
 				jspList.add(line);
 				return;
 			}
-			
+			String nonCssLine = null;
+			//Condition, if Id already exists in tag 
 			if(line.contains("id=\"")){
 				String idFinder = line.substring(line.indexOf("id=\"")+4, line.length());
 				cssId = idFinder.substring(0, idFinder.indexOf("\""));
@@ -366,6 +367,8 @@ public class AutomateCss {
 				nonCssLine = nonCssLine.replaceAll("style=\"" + cssStyle + "\"", "");
 			}
 			
+			
+			//nonCssLine = nonCssLine.substring(0, nonCssLine.indexOf(" ")) + " id=\"" + cssId + "\" " + nonCssLine.substring(nonCssLine.indexOf(" ")+1, nonCssLine.length());
 			System.out.println(cssId + ":cssId,---,cssStyle:" + cssStyle);
 			cssList.add("#" + cssId + " { " + cssStyle + " }");
 			
@@ -377,11 +380,6 @@ public class AutomateCss {
 		
 	}
 	
-	/**
-	 * Function to remove the Javascript code (without scriplet) from jsp
-	 * @param jsStrList
-	 * @param jspStrList
-	 */
 	private void deleteJsContentInJsp(List<String> jsStrList, List<String> jspStrList){
 		boolean isFunctionStarted = false;
 		int jsConentLineNo = 0;
@@ -391,7 +389,7 @@ public class AutomateCss {
 				isFunctionStarted = true;
 				jsConentLineNo = (jsConentLineNo == 0 ? jspStrList.indexOf(jsStr) : jsConentLineNo);
 				jspStrList.remove(jsConentLineNo);
-				
+				//jsConentLineNo++;
 				if(jsStr.contains("{") && jsStr.contains("}")){
 				}else if(jsStr.contains("{"))
 					startBraceCounter++;
@@ -411,22 +409,8 @@ public class AutomateCss {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		
-		JFileChooser jfc = new JFileChooser("C:\\SupplyWEB_Head\\tomcat4.1\\webapps\\supplyWeb\\jsp");
-		jfc.setDialogTitle("Choose a directory to process CSP files: ");
-		jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-
-		int returnValue = jfc.showOpenDialog(null);
-		if (returnValue == JFileChooser.APPROVE_OPTION) {
-			File selectedDir = jfc.getSelectedFile();
-			if (selectedDir.isDirectory()) {
-				directoryPath = selectedDir.getAbsolutePath();
-				AutomateCss listFilesUtil = new AutomateCss();
-				listFilesUtil.listFilesAndFilesSubDirectories(directoryPath);
-			}
-		}
-		
-		
+		AutomateCss listFilesUtil = new AutomateCss();
+		listFilesUtil.listFilesAndFilesSubDirectories(FILE_PATH);
 	}
 	
 }
